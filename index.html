@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loco Latency Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .progress {
+            margin: 10px 0;
+            height: 20px;
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4285f4;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        #rawData {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+        .compact-overview {
+            background-color: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+        }
+        .compact-overview > div {
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .compact-overview .pops-label,
+        .compact-overview .setup-latency-label {
+            color: #666;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Loco Latency Test</h1>
+    <p>This tool measures how long it takes to access Loco's servers by sending multiple requests and calculating statistical metrics.</p>
+
+    <div class="controls">
+        <p>
+            <button id="startButton">Start Test</button>
+        </p>
+
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div id="progressText">Ready to start</div>
+    </div>
+
+
+    <div id="compactOverview" class="compact-overview" style="display: none;">
+        <div>
+            <span class="pops-label">PoPs:</span>
+            <span id="popList"></span>
+        </div>
+        <div>
+            <span class="setup-latency-label">Connection Setup latency:</span>
+            <span id="setupLatency">-</span>
+        </div>
+    </div>
+
+
+    <div class="results" id="results" style="display: none;">
+        <h2>Latency Statistics</h2>
+        <table id="statsTable">
+            <tr>
+                <th>Metric</th>
+                <script>
+                    const numTests = 4;
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<th>Test ${i}(ms)</th>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>Mean</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="mean-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>Median</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="median-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>90th Percentile (P90)</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="p90-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>95th Percentile (P95)</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="p95-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>99th Percentile (P99)</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="p99-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>Standard Deviation</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="std-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>Jitter</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="jitter-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>Min</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="min-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>Max</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="max-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>Sample Size</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="sampleSize-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+            <tr>
+                <td>>=P99</td>
+                <script>
+                    for (let i = 1; i <= numTests; i++) {
+                        document.write(`<td id="moreThanP99-${i}">-</td>`);
+                    }
+                </script>
+            </tr>
+        </table>
+
+    </div>
+
+    <div style="height: 15vh; width: 100%;"></div>
+
+    <script>
+        // DOM Elements
+        const startButton = document.getElementById('startButton');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const resultsDiv = document.getElementById('results');
+        const rawDataDiv = document.getElementById('rawData');
+        const compactOverview = document.getElementById('compactOverview');
+
+        // Variables
+        let isRunning = false;
+        let completedRequests = 0;
+        let totalRequests = 50;
+        let latencies = []
+        let pops = {}
+        let setupLatency = 0
+        // Start the test
+        startButton.addEventListener('click', () => {
+             isRunning = false;
+             completedRequests = 0;
+             latencies = []
+             pops = {}
+             setupLatency = 0
+             startTest();
+        });
+
+        // Main test function
+        async function startTest() {
+            // Reset and prepare UI
+            completedRequests = 0;
+            isRunning = true;
+            startButton.disabled = true;
+            progressBar.style.width = '0%';
+            progressText.textContent = 'Starting test...';
+            resultsDiv.style.display = 'none';
+            compactOverview.style.display = 'none';
+
+            performance.clearResourceTimings();
+            performance.setResourceTimingBufferSize(200);
+            // Create a new AbortController for this test run
+            try {
+                for (let i = 1; i <= numTests; i++) {
+                    if(i == 1) {
+                        completedRequests = 0
+                        await measureLatency(`https://dublin-api.loco.com/v1/ping/?connection=setup`)
+                        const latencyData = await callApis("https://dublin-api.loco.com/v1/ping/", totalRequests, i)
+                        latencies.push(latencyData)
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } else if (i == 2) {
+                        completedRequests = 0
+                        await measureLatency(`https://d1wou3zttkkd8p.cloudfront.net/v2/ping/?connection=setup`)
+                        const latencyData = await callApis("https://d1wou3zttkkd8p.cloudfront.net/v2/ping/", totalRequests, i)
+                        latencies.push(latencyData)
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } else if (i == 3) {
+                        completedRequests = 0
+                        await measureLatency(`https://ml.loco.gg/v1/ping/?connection=setup`)
+                        const latencyData = await callApis("https://ml.loco.gg/v1/ping/", totalRequests, i)
+                        latencies.push(latencyData)
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } else if (i == 4) {
+                        completedRequests = 0
+                        await measureLatency(`https://d25ewj6zyjkpka.cloudfront.net/v2/ping/?connection=setup`)
+                        const latencyData = await callApis("https://d25ewj6zyjkpka.cloudfront.net/v2/ping/", totalRequests, i)
+                        latencies.push(latencyData)
+                    } else {
+                       continue
+                    }
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                const resources = performance.getEntriesByType("resource");
+                const resource = resources.find(r => r.name == "https://dublin-api.loco.com/v1/ping/?connection=setup");
+                setupLatency = resource.duration
+                if (isRunning) {
+                    progressText.textContent = 'Test completed successfully!';
+                    calculateAndDisplayStats();
+                }
+            } catch (error) {
+                progressText.textContent = `Test error: ${error.message}`;
+            } finally {
+                isRunning = false;
+                startButton.disabled = false;
+            }
+        }
+
+        async function callApis(uri, totalRequests, testNo) {
+                var localLatencyData = []
+                for (let i = 0; i < totalRequests; i++) {
+                    if (!isRunning) break;
+                    await measureLatency(uri, i)
+                        .then(latency => {
+                            localLatencyData.push(latency);
+                            completedRequests++;
+                            updateProgress(testNo);
+                        })
+                        .catch(error => {
+                            console.error('Error measuring latency:', error);
+                            progressText.textContent = `Error: ${error.message}`;
+                        });
+
+                    // Add a small delay between requests to avoid overwhelming the browser
+                    await new Promise(resolve => setTimeout(resolve, 1));
+                }
+                return localLatencyData
+        }
+
+        // Function to measure latency to Google
+        async function measureLatency(url, index) {
+            const startTime = performance.now();
+            try {
+                const response = await fetch(`${url}`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: "no-cache",
+                    keepalive: false,
+                    //keepalive: index != totalRequests-1,
+                });
+                const endTime = performance.now();
+                const pop =  response.headers.get("x-amz-cf-pop")
+                if(!!pop && !pops[pop]) {
+                    pops[pop] = true
+                }
+                return endTime - startTime;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('Request was aborted');
+                }
+                throw error;
+            }
+        }
+
+        // Update progress UI
+        function updateProgress(testNo) {
+            const progressPercent = (completedRequests / (totalRequests)) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+            progressText.textContent = `Test ${testNo} Completed ${completedRequests} of ${(totalRequests)} requests (${progressPercent.toFixed(1)}%)`;
+        }
+
+        // Calculate statistics
+        function calculateStats(data) {
+            // Sort data for percentile calculations
+            const sortedData = [...data].sort((a, b) => a - b);
+
+            // Sample size
+            const n = data.length;
+
+            // Mean
+            const sum = data.reduce((a, b) => a + b, 0);
+            const mean = sum / n;
+
+            // Median (50th percentile)
+            const median = calculatePercentile(sortedData, 50);
+
+            // Percentiles
+            const p90 = calculatePercentile(sortedData, 90);
+            const p95 = calculatePercentile(sortedData, 95);
+            const p99 = calculatePercentile(sortedData, 99);
+
+            // Standard deviation
+            const variance = data.reduce((total, value) => {
+                return total + Math.pow(value - mean, 2);
+            }, 0) / n;
+            const stdDev = Math.sqrt(variance);
+
+            const meanLatency = data.reduce((a, b) => a + b, 0) / data.length;
+
+            // Min & Max
+            const min = sortedData[0];
+            const max = sortedData[n - 1];
+
+            // Calculate absolute differences from mean
+            const absoluteVariations = data.map(latency =>
+                Math.abs(latency - meanLatency)
+            );
+
+            // Average of absolute variations is a more network-specific jitter measure
+            const jitter = absoluteVariations.reduce((a, b) => a + b, 0) / absoluteVariations.length;
+
+            const moreThanP99 = sortedData.filter(a => a >= p99).length;
+            return {
+                mean,
+                median,
+                p90,
+                p95,
+                p99,
+                stdDev,
+                jitter,
+                min,
+                max,
+                sampleSize: n,
+                moreThanP99,
+            };
+        }
+
+        // Helper function to calculate percentile
+        function calculatePercentile(sortedData, percentile) {
+            if (sortedData.length === 0) return null;
+            const n = sortedData.length;
+            const index = (percentile / 100) * (n - 1); // Use n-1 instead of n
+
+            const lowerIndex = Math.floor(index);
+            const upperIndex = Math.ceil(index);
+
+            if (lowerIndex === upperIndex) {
+                return sortedData[lowerIndex]; // Exact index match
+            }
+
+            // Linear interpolation for better accuracy
+            const weight = index - lowerIndex;
+            return sortedData[lowerIndex] * (1 - weight) + sortedData[upperIndex] * weight;
+        }
+
+        // Display statistics and create chart
+        function calculateAndDisplayStats() {
+            for (let i = 1; i <= numTests; i++) {
+                const meanElem = document.getElementById(`mean-${i}`);
+                const medianElem = document.getElementById(`median-${i}`);
+                const p90Elem = document.getElementById(`p90-${i}`);
+                const p95Elem = document.getElementById(`p95-${i}`);
+                const p99Elem = document.getElementById(`p99-${i}`);
+                const stdElem = document.getElementById(`std-${i}`);
+                const jitterElem = document.getElementById(`jitter-${i}`);
+                const minElem = document.getElementById(`min-${i}`);
+                const maxElem = document.getElementById(`max-${i}`);
+                const sampleSizeElem = document.getElementById(`sampleSize-${i}`);
+                const moreThanP99Elem = document.getElementById(`moreThanP99-${i}`)
+
+                const latencyDataV1 = latencies[i-1]
+                if (latencyDataV1.length === 0) return;
+                const stats = calculateStats(latencies[i-1]);
+
+                meanElem.textContent = stats.mean.toFixed(2);
+                medianElem.textContent = stats.median.toFixed(2);
+                p90Elem.textContent = stats.p90.toFixed(2);
+                p95Elem.textContent = stats.p95.toFixed(2);
+                p99Elem.textContent = stats.p99.toFixed(2);
+                stdElem.textContent = stats.stdDev.toFixed(2);
+                jitterElem.textContent = stats.jitter.toFixed(2);
+                minElem.textContent = stats.min.toFixed(2);
+                maxElem.textContent = stats.max.toFixed(2);
+                sampleSizeElem.textContent = stats.sampleSize;
+                moreThanP99Elem.textContent = stats.moreThanP99;
+            }
+            const popNames = Object.keys(pops);
+            if (popNames.length > 0) {
+                document.getElementById('popList').textContent = popNames.join(', ');
+                document.getElementById('setupLatency').textContent = `${setupLatency.toFixed(2)} ms`;
+                compactOverview.style.display = 'flex';
+            }
+            resultsDiv.style.display = 'block';
+        }
+
+    </script>
+</body>
+</html>
